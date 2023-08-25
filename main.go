@@ -1,7 +1,32 @@
 package main
 
 import (
-	"regexp"
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var exp = regexp.MustCompile(`^(?P<remote>[^ ]*) (?P<host>[^ ]*) (?P<user>[^ ]*) \[(?P<time>[^\]]*)\] \"(?P<method>\w+)(?:\s+(?P<path>[^\"]*?)(?:\s+\S*)?)?\" (?P<status_code>[^ ]*) (?P<size>[^ ]*)(?:\s"(?P<referer>[^\"]*)") "(?P<agent>[^\"]*)" (?P<urt>[^ ]*)$`)
+func main() {
+	var (
+		promPort = flag.Int("prom.port", 9150, "port to expose prometheus metrics")
+	)
+	flag.Parse()
+
+	reg := prometheus.NewRegistry()
+	// reg.MustRegister(collectors.NewGoCollector())
+
+	mux := http.NewServeMux()
+	promHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	mux.Handle("/metrics", promHandler)
+
+	port := fmt.Sprintf(":%d", *promPort)
+	log.Printf("Exporter is started on %q/metrics", port)
+	if err := http.ListenAndServe(port, mux); err != nil {
+		log.Fatalf("Error, the Exporter can't be run : %s", err)
+	}
+
+}
